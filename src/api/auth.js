@@ -1,12 +1,8 @@
 // const { nanoid } = require('nanoid');
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const db = require("./database");
+const db = require("../database");
 require("dotenv").config();
-
-exports.hello = async (req, res) => {
-  res.send("Hello World!");
-};
 
 //* Create Token
 const maxExpire = 3 * 24 * 60 * 60;
