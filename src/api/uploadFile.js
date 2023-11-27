@@ -5,8 +5,8 @@ const Multer = require("multer");
 const storage = new Storage({ keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS });
 const bucket = storage.bucket("cakrawala-storage");
 // Mulai dari sini
-// const { ImageAnnotatorClient } = require("@google-cloud/vision");
-// const vision = new ImageAnnotatorClient();
+const vision = require("@google-cloud/vision").v1;
+const client = new vision.ImageAnnotatorClient();
 
 const maxSize = 2 * 1024 * 1024;
 
@@ -33,7 +33,6 @@ const processFile = multerInstance.single("file");
 
 const processFileMiddleware = util.promisify(processFile);
 
-// Ini juga
 // Function to generate a unique filename
 function generateUniqueFileName(originalname) {
   const timestamp = new Date().toISOString().replace(/[^a-zA-Z0-9]/g, "");
@@ -54,8 +53,9 @@ exports.upload = async (req, res) => {
     }
 
     // Create a new blob in the bucket and upload the file data.
-    const uniqueFileName = generateUniqueFileName(req.file.originalname);
-    const blob = bucket.file(uniqueFileName);
+    const fileName = generateUniqueFileName(req.file.originalname);
+    const folderUpload = "uploads";
+    const blob = bucket.file(`${folderUpload}/${fileName}`);
     const blobStream = blob.createWriteStream({
       resumable: false,
     });
@@ -66,43 +66,67 @@ exports.upload = async (req, res) => {
 
     blobStream.on("finish", async (data) => {
       // Create URL for direct file access via HTTP.
+      // ini perlu dibuat didalam folder uploads
       const publicUrl = format(`https://storage.googleapis.com/${bucket.name}/${blob.name}`);
 
       try {
         // Make the file public
         await bucket.file(req.file.originalname).makePublic();
       } catch (makePublicError) {
+        // Mulai dari sini
+        /**
+         * TODO(developer): Uncomment the following lines before running the sample.
+         */
+        // Bucket where the file resides
+        const bucketName = "cakrawala-storage";
+        // Path to PDF file within bucket
+        // const fileName = `${blob.name}`;
+        // The folder to store the results
+        const outputPrefix = "results";
+        const outputFileName = `processed_${fileName}`;
+
+        const gcsSourceUri = `gs://${bucketName}/${folderUpload}/${fileName}`;
+        console.log(gcsSourceUri);
+        const gcsDestinationUri = `gs://${bucketName}/${outputPrefix}/${outputFileName}`;
+
+        const inputConfig = {
+          // Supported mime_types are: 'application/pdf' and 'image/tiff'
+          mimeType: "application/pdf",
+          gcsSource: {
+            uri: gcsSourceUri,
+          },
+        };
+        const outputConfig = {
+          gcsDestination: {
+            uri: gcsDestinationUri,
+          },
+        };
+        const features = [{ type: "DOCUMENT_TEXT_DETECTION" }];
+        const request = {
+          requests: [
+            {
+              inputConfig: inputConfig,
+              features: features,
+              outputConfig: outputConfig,
+            },
+          ],
+        };
+
+        const [operation] = await client.asyncBatchAnnotateFiles(request);
+        const [filesResponse] = await operation.promise();
+        const destinationUri = filesResponse.responses[0].outputConfig.gcsDestination.uri;
+        console.log("Json saved to: " + destinationUri);
+        // end
         return res.status(500).send({
+          // message: "Json saved to: " + destinationUri,
           message: `Uploaded the file successfully: ${req.file.originalname}, but public access is denied!`,
           url: publicUrl,
         });
       }
 
-      // Mulai dari sini
-      // try {
-      //   // Menggunakan Cloud Vision API untuk mendeteksi teks pada file
-      //   const [result] = await vision.textDetection(`gs://${bucket.name}/${blob.name}`);
-      //   const detections = result.textAnnotations;
-
-      //   // Mendapatkan teks dari hasil deteksi
-      //   const extractedText = detections[0].description;
-
-      //   // Menambahkan teks ke respons atau melakukan apa pun yang diperlukan
-      //   res.status(200).send({
-      //     message: "Uploaded the file successfully: " + req.file.originalname,
-      //     url: publicUrl,
-      //     extractedText: extractedText,
-      //   });
-      // } catch (visionError) {
-      //   // Handle error dari Cloud Vision API
-      //   res.status(500).send({
-      //     message: `Error in Cloud Vision API: ${visionError.message}`,
-      //     url: publicUrl,
-      //   });
-      // }
-
       res.status(200).send({
         message: "Uploaded the file successfully: " + req.file.originalname,
+        // message: "Json saved to: " + destinationUri,
         url: publicUrl,
       });
     });

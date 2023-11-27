@@ -1,5 +1,5 @@
 const express = require("express");
-const { requireAuthMember } = require("./middlewares")
+const { requireAuthMember } = require("./middlewares");
 
 const { signupPost, login, logout } = require("./api/auth");
 const { upload } = require("./api/uploadFile");
@@ -11,7 +11,7 @@ routes.post("/register", signupPost);
 routes.post("/login", login);
 routes.post("/logout", logout);
 
-routes.post("/upload", upload);
+routes.post("/upload", requireAuthMember, upload);
 routes.post("/uploadText", requireAuthMember, uploadText);
 // routes.post("/uploadText", requireAuthMember);
 
