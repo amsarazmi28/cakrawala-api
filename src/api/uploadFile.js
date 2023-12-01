@@ -43,7 +43,7 @@ function generateUniqueFileName(originalname) {
 }
 
 // function decoded
-function jwtDecoded(reqCookie){
+function jwtDecoded(reqCookie) {
   // jwt decode
   const token = reqCookie;
   var id;
@@ -72,13 +72,7 @@ exports.upload = async (req, res) => {
     const blob = bucket.file(`${folderUpload}/${fileName}`);
     const imagePath = path.join(folderUpload, fileName);
 
-    // Membuat folder "uploads" jika belum ada
-    if (!fs.existsSync(folderUpload)) {
-      fs.mkdirSync(folderUpload);
-    }
 
-    // Save the uploaded image to a local folder
-    fs.writeFileSync(imagePath, req.file.buffer);
 
     const blobStream = blob.createWriteStream({
       resumable: false,
@@ -91,27 +85,35 @@ exports.upload = async (req, res) => {
     function splitParagraf(paragraf) {
       // Mengganti semua \n dengan spasi
       paragraf = paragraf.replace(/\n/g, ' ');
-    
+
       // Membagi paragraf menjadi kalimat-kalimat menggunakan regex
       var kalimatArray = paragraf.split(/[.!?]/);
-    
+
       // Membersihkan array dari elemen yang kosong
-      kalimatArray = kalimatArray.filter(function(kalimat) {
-          return kalimat.trim() !== '';
+      kalimatArray = kalimatArray.filter(function (kalimat) {
+        return kalimat.trim() !== '';
       });
-    
+
       return kalimatArray;
     }
 
     blobStream.on("finish", async () => {
-      
+
       if (req.file.mimetype.includes("image")) {
         // jwt
         id = jwtDecoded(req.cookies.jwt);
-        
+
+        // Membuat folder "uploads" jika belum ada
+        if (!fs.existsSync(folderUpload)) {
+          fs.mkdirSync(folderUpload);
+        }
+
+        // Save the uploaded image to a local folder
+        fs.writeFileSync(imagePath, req.file.buffer);
+
         // Extract Text
         const [result] = await client.textDetection(imagePath);
-        
+
         const textAnnotations = result.textAnnotations;
         const extractedText = textAnnotations[0] ? textAnnotations[0].description : "No text found in the image.";
         const splitedText = splitParagraf(extractedText);
@@ -125,7 +127,7 @@ exports.upload = async (req, res) => {
 
         const publicUrl = format(`https://storage.googleapis.com/${bucket.name}/${blob.name}`);
         const textPublicUrl = format(`https://storage.googleapis.com/${bucket.name}/${textBlob.name}`);
-        
+
         textBlobStream.on("error", (err) => {
           res.status(500).send({ message: err.message });
         });
@@ -191,11 +193,11 @@ exports.upload = async (req, res) => {
 
         return res.status(200).send({
           message: "Uploaded the file and extracted text successfully: " + req.file.originalname,
-            sourceUrl: publicUrl,
-            destinationUrl: textPublicUrl,
-            // extractedText: extractedText,
+          sourceUrl: publicUrl,
+          destinationUrl: textPublicUrl,
+          // extractedText: extractedText,
         });
-      } 
+      }
     });
 
 

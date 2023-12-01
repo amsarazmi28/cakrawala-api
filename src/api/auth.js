@@ -100,6 +100,7 @@ exports.login = async (req, res) => {
     const auth = bcrypt.compare(password, rows[0].password);
     if (auth) {
       const token = createToken(rows[0].id);
+      re
       res.cookie("jwt", token, { httpOnly: false, maxAge: maxExpire * 1000 });
       const response = res.status(200).json({
         message: "Logged in!",
