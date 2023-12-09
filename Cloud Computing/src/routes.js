@@ -22,6 +22,14 @@ routes.post("/upload", requireAuthMember, upload);
 routes.post("/uploadText", requireAuthMember, uploadText);
 routes.get("/history", requireAuthMember, getHistory);
 routes.delete("/history/:id", requireAuthMember, deleteHistory);
-// routes.post("/uploadText", requireAuthMember);
+// test
+// Example route handler
+// routes.get("/some-protected-route", requireAuthMember, (req, res) => {
+//     const user = req.user;
+
+  
+//     // Your logic here using userId and isPremium
+//     res.json({ user, message: "This is a protected route" });
+//   });
 
 module.exports = routes;

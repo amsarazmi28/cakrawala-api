@@ -7,8 +7,8 @@ require("dotenv").config();
 
 //* Create Token
 const maxExpire = 3 * 24 * 60 * 60;
-const createToken = (id) =>
-  jwt.sign({ id }, process.env.SECRET_STRING, {
+const createToken = (id, isPremium) =>
+  jwt.sign({ id, isPremium }, process.env.SECRET_STRING, {
     expiresIn: maxExpire,
   });
 
@@ -99,7 +99,7 @@ exports.login = async (req, res) => {
   if (rows.length !== 0) {
     const auth = bcrypt.compare(password, rows[0].password);
     if (auth) {
-      const token = createToken(rows[0].id);
+      const token = createToken(rows[0].id, rows[0].premium);      
       res.cookie("jwt", token, { httpOnly: false, maxAge: maxExpire * 1000 });
       const response = res.status(200).json({
         message: "Logged in!",

@@ -9,14 +9,16 @@ const requireAuthMember = (req, res, next) => {
   }
 
   // Check JWT exist & is verified
-  jwt.verify(token, process.env.SECRET_STRING, (err) => {
+  jwt.verify(token, process.env.SECRET_STRING, (err, decodedToken) => {
     if (err) {
       return res.status(400).json({ message: "Anda tidak memiliki hak untuk mengakses request ini!" });
     }
-    // console.log(decodedToken);
+
+    // Attach id and isPremium to the req object
+    req.user = {id: decodedToken.id, isPremium: decodedToken.isPremium};
+
     return next();
   });
-  return 0;
 };
 
 const requireAuthAdmin = (req, res, next) => {
@@ -31,10 +33,9 @@ const requireAuthAdmin = (req, res, next) => {
     if (err) {
       return res.status(400).json({ message: "Request ini hanya bisa diakses oleh admin!" });
     }
-    // console.log(decodedToken);
+
     return next();
   });
-  return 0;
 };
 
 module.exports = { requireAuthMember, requireAuthAdmin };

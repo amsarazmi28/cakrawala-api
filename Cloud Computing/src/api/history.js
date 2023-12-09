@@ -64,6 +64,9 @@ exports.deleteHistory = async (req, res) => {
             // Delete processed file
             await storage.bucket(bucketName).file(processed_filename).delete();
 
+            // Delete Sql
+            await db.promise().query(`DELETE FROM uploads WHERE id = ${rows[0].id}`);
+
             const response = res.status(201).send({
                 status: "Success",
                 message: "Files deleted successfully",
