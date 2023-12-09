@@ -7,14 +7,14 @@ require("dotenv").config();
 
 //* Create Token
 const maxExpire = 3 * 24 * 60 * 60;
-const createToken = (id, isPremium) =>
-  jwt.sign({ id, isPremium }, process.env.SECRET_STRING, {
+const createToken = (id, username, isPremium) =>
+  jwt.sign({ id, username, isPremium }, process.env.SECRET_STRING, {
     expiresIn: maxExpire,
   });
 
 //* Register
 exports.signupPost = async (req, res) => {
-  const { email, password } = req.body;
+  const { username, email, password } = req.body;
 
   // const id = nanoid(16);
 
@@ -41,7 +41,7 @@ exports.signupPost = async (req, res) => {
     return response;
   }
 
-  const [rows] = await db.promise().query(`SELECT * FROM users WHERE email = '${req.body.email}'`);
+  const [rows] = await db.promise().query(`SELECT * FROM users WHERE email = ?`, [req.body.email]);
   if (rows.length !== 0) {
     return res.status(500).json({ message: "User with that email is already exist" });
   }
@@ -49,7 +49,7 @@ exports.signupPost = async (req, res) => {
   const salt = await bcrypt.genSalt();
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  await db.promise().query(`INSERT INTO users (email, password) VALUES('${email}', '${hashedPassword}')`);
+  await db.promise().query(`INSERT INTO users (username, email, password) VALUES(?, ?, ?)`, [username, email, hashedPassword]);
 
   const response = res.send({
     status: "Sukses",
@@ -77,15 +77,6 @@ exports.login = async (req, res) => {
     return res.status(400).json({ error: "Alamat email tidak valid" });
   }
 
-  if (email.length < 6) {
-    const response = res.send({
-      status: "Gagal",
-      message: "Panjang email harus 6 karakter atau lebih!",
-    });
-    response.status(400);
-    return response;
-  }
-
   if (password.length < 6) {
     const response = res.send({
       status: "Gagal",
@@ -95,16 +86,20 @@ exports.login = async (req, res) => {
     return response;
   }
 
-  const [rows] = await db.promise().query(`SELECT * FROM users WHERE email = '${req.body.email}'`);
+  const [rows] = await db.promise().query(`SELECT * FROM users WHERE email = ?`, [req.body.email]);
   if (rows.length !== 0) {
     const auth = bcrypt.compare(password, rows[0].password);
     if (auth) {
-      const token = createToken(rows[0].id, rows[0].premium);      
+      const token = createToken(rows[0].id, rows[0].username, rows[0].premium);      
       res.cookie("jwt", token, { httpOnly: false, maxAge: maxExpire * 1000 });
       const response = res.status(200).json({
         message: "Logged in!",
         user_id: rows[0].id,
-        token: token,
+        data: {
+          user_id: rows[0].id,
+          username: rows[0].username,
+          token: token
+        }
       });
       return response;
     }

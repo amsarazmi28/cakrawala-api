@@ -21,7 +21,7 @@ exports.getHistory = async(req, res) => {
     // jwt
     id = jwtDecoded(req.cookies.jwt);
 
-    const [rows] = await db.promise().query(`SELECT * FROM uploads WHERE user_id = ${id}`);
+    const [rows] = await db.promise().query('SELECT * FROM uploads WHERE user_id = ?', [id]);
     if (rows.length) {
         const response = res.status(201).send({
             status: "Sukses",
@@ -42,7 +42,7 @@ exports.getHistory = async(req, res) => {
 exports.deleteHistory = async (req, res) => {
     try {
         const id = req.params.id;
-        const [rows] = await db.promise().query(`SELECT * FROM uploads WHERE id = ${id}`);
+        const [rows] = await db.promise().query(`SELECT * FROM uploads WHERE id = ?`, [id]);
 
         if (rows.length) {
             // The ID of your GCS bucket
@@ -65,7 +65,7 @@ exports.deleteHistory = async (req, res) => {
             await storage.bucket(bucketName).file(processed_filename).delete();
 
             // Delete Sql
-            await db.promise().query(`DELETE FROM uploads WHERE id = ${rows[0].id}`);
+            await db.promise().query(`DELETE FROM uploads WHERE id = ?`, [rows[0].id]);
 
             const response = res.status(201).send({
                 status: "Success",
