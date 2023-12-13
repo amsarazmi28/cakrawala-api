@@ -13,6 +13,11 @@ const client = new vision.ImageAnnotatorClient();
 const db = require("../database");
 require("dotenv").config();
 
+// tf
+// const express = require('express');
+// const bodyParser = require('body-parser');
+const tf = require('@tensorflow/tfjs-node');
+
 // jwt
 const jwt = require('jsonwebtoken');
 
@@ -71,6 +76,41 @@ function splitParagraf(paragraf) {
   });
 
   return kalimatArray;
+}
+
+// function tf aku ngarang
+async function tfPredict(inputData) {
+  const userInput = inputData;
+
+  // Preprocess the user input similar to the training data
+  const userInputFeatures = tf.tidy(() => {
+    // Assuming tfidf is a pre-trained tf-idf model
+    return tf.tensor2d(tfidf.transform([userInput]).toarray());
+  });
+
+  // Load the trained model for prediction
+  const loadedModel = await tf.loadLayersModel('Machine Learning/model.json');
+
+  // Predict whether the input is AI-generated or human-written
+  const prediction = loadedModel.predict(userInputFeatures);
+  const aiGeneratedPercentage = prediction.dataSync()[0] * 100;
+  const humanWrittenPercentage = 100 - aiGeneratedPercentage;
+
+  // Determine if input is AI-generated or human-written based on a threshold
+  const threshold = 0.5;
+  const inputType = aiGeneratedPercentage > threshold ? 'AI-generated' : 'Human-written';
+
+  // Send the response
+  res.json({
+    aiGeneratedPercentage: aiGeneratedPercentage.toFixed(2),
+    humanWrittenPercentage: humanWrittenPercentage.toFixed(2),
+    inputType: inputType,
+  });
+  // return {
+  //   aiGeneratedPercentage: aiGeneratedPercentage.toFixed(2),
+  //   humanWrittenPercentage: humanWrittenPercentage.toFixed(2),
+  //   inputType: inputType,
+  // };
 }
 
 exports.upload = async (req, res) => {
@@ -250,6 +290,9 @@ exports.upload = async (req, res) => {
           extractedText = extractedText.slice(0, MAX_CHAR);
           resCharLength = "Jumlah melebihi 2000 karakter, hanya mengambil 2000 karakter pertama";
         }
+
+        // predict
+        await tfPredict(extractedText);
 
         const destinationUri = filesResponse.responses[0].outputConfig.gcsDestination.uri;
 
