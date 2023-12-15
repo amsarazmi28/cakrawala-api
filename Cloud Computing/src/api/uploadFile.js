@@ -160,6 +160,8 @@ exports.upload = async (req, res) => {
         // Database
         await db.promise().query(`INSERT INTO uploads (id, raw_file, raw_filename, processed_file, processed_filename, user_id) VALUES(?, ?, ?, ?, ?, ?)`, [uploadId, publicUrl, fileName, textPublicUrl, textFileName, id]);
 
+        list_ai_sentences = JSON.stringify(prediction.list_ai_sentences);
+
         await db
           .promise()
           .query(`INSERT INTO results (id, result_generated, ai_percentage, human_percentage, list_ai_sentences, upload_id) VALUES(?, ?, ?, ?, ?, ?)`, [
@@ -167,7 +169,7 @@ exports.upload = async (req, res) => {
             prediction.result,
             prediction.ai_precentage,
             prediction.human_precentage,
-            prediction.list_ai_sentences,
+            list_ai_sentences,
             uploadId,
           ]);
 
@@ -177,11 +179,15 @@ exports.upload = async (req, res) => {
 
           res.status(200).send({
             message: "Uploaded the file and extracted text successfully: " + req.file.originalname,
-            imageUrl: publicUrl,
-            textUrl: textPublicUrl,
-            extractedText: extractedText,
-            splitedText: splitedText,
-            resCharLength: resCharLength,
+            status: "Sukses",
+            data: {
+              imageUrl: publicUrl,
+              textUrl: textPublicUrl,
+              extractedText: extractedText,
+              splitedText: splitedText,
+              resCharLength: resCharLength,
+              result: prediction,
+            },
           });
         });
 
@@ -296,6 +302,8 @@ exports.upload = async (req, res) => {
         // Database
         await db.promise().query(`INSERT INTO uploads (id, raw_file, raw_filename, processed_file, processed_filename, user_id) VALUES(?, ?, ?, ?, ?, ?)`, [uploadId, publicUrl, fileName, textPublicUrl, outputFileName, id]);
 
+        list_ai_sentences = JSON.stringify(prediction.list_ai_sentences);
+
         await db
           .promise()
           .query(`INSERT INTO results (id, result_generated, ai_percentage, human_percentage, list_ai_sentences, upload_id) VALUES(?, ?, ?, ?, ?, ?)`, [
@@ -303,16 +311,20 @@ exports.upload = async (req, res) => {
             prediction.result,
             prediction.ai_precentage,
             prediction.human_precentage,
-            prediction.list_ai_sentences ,
+            list_ai_sentences,
             uploadId,
           ]);
 
         return res.status(200).send({
           message: "Uploaded the file and extracted text successfully: " + req.file.originalname,
-          sourceUrl: httpPublicUrl,
-          destinationUrl: httpTextPublicUrl,
-          extractedText: extractedText,
-          resCharLength: resCharLength,
+          status: "Sukses",
+          data: {
+            sourceUrl: httpPublicUrl,
+            destinationUrl: httpTextPublicUrl,
+            extractedText: extractedText,
+            resCharLength: resCharLength,
+            result: prediction,
+          },
         });
       }
     });

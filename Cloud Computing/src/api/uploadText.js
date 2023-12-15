@@ -119,6 +119,9 @@ exports.uploadText = async (req, res) => {
   //   const resultId = crypto.randomUUID()
   // }
 
+  list_ai_sentences = JSON.stringify(prediction.list_ai_sentences);
+  // console.log(list_ai_sentences);
+
   await db
     .promise()
     .query(`INSERT INTO results (id, result_generated, ai_percentage, human_percentage, list_ai_sentences, upload_id) VALUES(?, ?, ?, ?, ?, ?)`, [
@@ -126,7 +129,7 @@ exports.uploadText = async (req, res) => {
       prediction.result,
       prediction.ai_precentage,
       prediction.human_precentage,
-      prediction.list_ai_sentences,
+      list_ai_sentences,
       uploadId,
     ]);
 
