@@ -19,20 +19,37 @@ function jwtDecoded(reqCookie) {
 
 exports.getHistory = async (req, res) => {
   // jwt
-  id = jwtDecoded(req.cookies.jwt);
+  const id = jwtDecoded(req.cookies.jwt);
+  const page = parseInt(req.query.page) || 1; // Default to page 1 if not specified
+  const itemsPerPage = parseInt(req.query.itemsPerPage) || 10; // Default to 10 items per page if not specified
 
-  // const [rows] = await db.promise().query('SELECT * FROM uploads WHERE user_id = ?', [id]);
-  const [rows] = await db.promise().query("SELECT uploads.*, results.* FROM uploads JOIN results ON uploads.id = results.upload_id WHERE uploads.user_id = ?", [id]);
+  const offset = (page - 1) * itemsPerPage;
+
+  // Use placeholders in the SQL query for better security
+  const sqlQuery = `
+      SELECT uploads.*, results.*
+      FROM uploads
+      JOIN results ON uploads.id = results.upload_id
+      WHERE uploads.user_id = ?
+      ORDER BY uploads.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+  const [rows] = await db.promise().query(sqlQuery, [id, itemsPerPage, offset]);
 
   if (rows.length) {
-    const response = res.status(201).send({
+    const response = res.status(200).send({
       status: "Sukses",
       message: rows,
+      pagination: {
+        page: page,
+        itemsPerPage: itemsPerPage,
+      },
     });
 
     return response;
   } else {
-    const response = res.status(201).send({
+    const response = res.status(200).send({
       status: "Sukses",
       message: "Belum ada history yang ditemukan!",
     });
