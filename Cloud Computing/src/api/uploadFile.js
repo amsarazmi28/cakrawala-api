@@ -2,24 +2,22 @@ const { Storage } = require("@google-cloud/storage");
 const util = require("util");
 const { format } = require("util");
 const Multer = require("multer");
-const fs = require('fs');
-const path = require('path');
-const rimraf = require('rimraf');
+const fs = require("fs");
+const path = require("path");
+const rimraf = require("rimraf");
 const storage = new Storage({ keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS });
 const bucket = storage.bucket(process.env.BUCKET_NAME);
 const vision = require("@google-cloud/vision").v1;
 const client = new vision.ImageAnnotatorClient();
+const axios = require("axios");
+const crypto = require("crypto");
 // db
+
 const db = require("../database");
 require("dotenv").config();
 
-// tf
-// const express = require('express');
-// const bodyParser = require('body-parser');
-const tf = require('@tensorflow/tfjs-node');
-
 // jwt
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
 const maxSize = 2 * 1024 * 1024;
 
@@ -54,7 +52,7 @@ function jwtDecoded(reqCookie) {
   var id;
   jwt.verify(token, process.env.SECRET_STRING, (err, decoded) => {
     if (err) {
-      return res.status(401).json({ message: 'Failed to authenticate token' });
+      return res.status(401).json({ message: "Failed to authenticate token" });
     }
 
     // The decoded payload is available in the 'decoded' object
@@ -65,52 +63,17 @@ function jwtDecoded(reqCookie) {
 
 function splitParagraf(paragraf) {
   // Mengganti semua \n dengan spasi
-  paragraf = paragraf.replace(/\n/g, ' ');
+  paragraf = paragraf.replace(/\n/g, " ");
 
   // Membagi paragraf menjadi kalimat-kalimat menggunakan regex
   var kalimatArray = paragraf.split(/[.!?]/);
 
   // Membersihkan array dari elemen yang kosong
   kalimatArray = kalimatArray.filter(function (kalimat) {
-    return kalimat.trim() !== '';
+    return kalimat.trim() !== "";
   });
 
   return kalimatArray;
-}
-
-// function tf aku ngarang
-async function tfPredict(inputData) {
-  const userInput = inputData;
-
-  // Preprocess the user input similar to the training data
-  const userInputFeatures = tf.tidy(() => {
-    // Assuming tfidf is a pre-trained tf-idf model
-    return tf.tensor2d(tfidf.transform([userInput]).toarray());
-  });
-
-  // Load the trained model for prediction
-  const loadedModel = await tf.loadLayersModel('Machine Learning/model.json');
-
-  // Predict whether the input is AI-generated or human-written
-  const prediction = loadedModel.predict(userInputFeatures);
-  const aiGeneratedPercentage = prediction.dataSync()[0] * 100;
-  const humanWrittenPercentage = 100 - aiGeneratedPercentage;
-
-  // Determine if input is AI-generated or human-written based on a threshold
-  const threshold = 0.5;
-  const inputType = aiGeneratedPercentage > threshold ? 'AI-generated' : 'Human-written';
-
-  // Send the response
-  res.json({
-    aiGeneratedPercentage: aiGeneratedPercentage.toFixed(2),
-    humanWrittenPercentage: humanWrittenPercentage.toFixed(2),
-    inputType: inputType,
-  });
-  // return {
-  //   aiGeneratedPercentage: aiGeneratedPercentage.toFixed(2),
-  //   humanWrittenPercentage: humanWrittenPercentage.toFixed(2),
-  //   inputType: inputType,
-  // };
 }
 
 exports.upload = async (req, res) => {
@@ -138,14 +101,11 @@ exports.upload = async (req, res) => {
       res.status(500).send({ message: err.message });
     });
 
-
     blobStream.on("finish", async () => {
-
       const MAX_CHAR = 2000;
       var resCharLength;
 
       if (req.file.mimetype.includes("image")) {
-
         // Membuat folder "uploads" jika belum ada
         if (!fs.existsSync(folderUpload)) {
           fs.mkdirSync(folderUpload);
@@ -161,7 +121,7 @@ exports.upload = async (req, res) => {
         extractedText = textAnnotations[0] ? textAnnotations[0].description : "No text found in the image.";
 
         // Filter file included text under 2000 char
-        extractedText = extractedText.replace(/\n/g, ' ');
+        extractedText = extractedText.replace(/\n/g, " ");
 
         if (extractedText.length > MAX_CHAR) {
           extractedText = extractedText.slice(0, MAX_CHAR);
@@ -184,6 +144,33 @@ exports.upload = async (req, res) => {
           res.status(500).send({ message: err.message });
         });
 
+        var prediction;
+        try {
+          const response = await axios.post("http://127.0.0.1:5003/predict", { data: extractedText });
+          prediction = response.data.prediction;
+          // console.log(prediction);
+          // res.json({ prediction });
+        } catch (error) {
+          // console.log(error.message);
+          res.json({ error: error.message });
+        }
+
+        const resultId = crypto.randomInt(10000000);
+        const uploadId = crypto.randomInt(10000000);
+        // Database
+        await db.promise().query(`INSERT INTO uploads (id, raw_file, raw_filename, processed_file, processed_filename, user_id) VALUES(?, ?, ?, ?, ?, ?)`, [uploadId, publicUrl, fileName, textPublicUrl, textFileName, id]);
+
+        await db
+          .promise()
+          .query(`INSERT INTO results (id, result_generated, ai_percentage, human_percentage, list_ai_sentences, upload_id) VALUES(?, ?, ?, ?, ?, ?)`, [
+            resultId,
+            prediction.result,
+            prediction.ai_precentage,
+            prediction.human_precentage,
+            prediction.list_ai_sentences,
+            uploadId,
+          ]);
+
         textBlobStream.on("finish", async () => {
           // Hapus folder "uploads" dan file lokal setelah pemrosesan selesai
           rimraf.sync(folderUpload);
@@ -194,21 +181,20 @@ exports.upload = async (req, res) => {
             textUrl: textPublicUrl,
             extractedText: extractedText,
             splitedText: splitedText,
-            resCharLength: resCharLength
+            resCharLength: resCharLength,
           });
         });
 
-        await db.promise().query(`INSERT INTO uploads (raw_file, raw_filename, processed_file, processed_filename, result_file, user_id) VALUES(?, ?, ?, ?, 'generated by ai', ?)`, [publicUrl, fileName, textPublicUrl, textFileName, id]);
+        // await db.promise().query(`INSERT INTO uploads (raw_file, raw_filename, processed_file, processed_filename, result_file, user_id) VALUES(?, ?, ?, ?, 'generated by ai', ?)`, [publicUrl, fileName, textPublicUrl, textFileName, id]);
 
         textBlobStream.end(extractedText);
-        
       } else if (req.file.mimetype.includes("pdf")) {
         var outputFileName = `${fileName}_text`;
         var countPage = 0;
 
         const publicUrl = `gs://${bucket.name}/${folderUpload}/${fileName}`;
         var textPublicUrl = `gs://${bucket.name}/${outputPrefix}/${outputFileName}`;
-        
+
         // HTTP URLs for display purposes
         const httpPublicUrl = `http://storage.googleapis.com/${bucket.name}/${folderUpload}/${fileName}`;
         // ini aku tambahin output-1-to-1.json
@@ -248,28 +234,26 @@ exports.upload = async (req, res) => {
         // Try to download file
         fileDownload = `${outputPrefix}/${outputFileName}`;
         // List all files in the bucket
-        const [files] = await bucket.getFiles(
-          {prefix: "results"}
-        );
+        const [files] = await bucket.getFiles({ prefix: "results" });
 
         // Filter files based on filename containing "test"
-        const testFiles = files.filter(file => file.name.includes(outputFileName));
+        const testFiles = files.filter((file) => file.name.includes(outputFileName));
 
         // Download each file
         var jsonFile = [];
         for (const file of testFiles) {
           const fileDownload = `${outputPrefix}/${file.name}`;
           [jsonFile] = await bucket.file(file.name).download();
-          
+
           // Process the downloaded file (jsonFile) as needed
           // console.log(`Downloaded file: ${fileDownload}`);
         }
         // const [jsonFile] = await bucket.file(fileDownload).download();
-        
+
         // Parse the JSON content
         const jsonData = JSON.parse(jsonFile.toString());
-        // // try to count page
-        
+        // try to count page
+
         jsonData.responses.forEach((response, index) => {
           // Do something with each response
           countPage = index + 1;
@@ -279,26 +263,49 @@ exports.upload = async (req, res) => {
         const httpTextPublicUrl = `http://storage.googleapis.com/${bucket.name}/${outputPrefix}/${outputFileName}output-1-to-${countPage}.json`;
         textPublicUrl = `gs://${bucket.name}/${outputPrefix}/${outputFileName}output-1-to-${countPage}.json`;
         outputFileName = `${fileName}_text-output-1-to-${countPage}.json`;
-        
+
         // ectracted text mau gimana soalnya udah bisa 2 halaman
         extractedText = jsonData.responses[0].fullTextAnnotation.text;
 
         // Filter file included text under 2000 char
-        extractedText = extractedText.replace(/\n/g, ' ');
+        extractedText = extractedText.replace(/\n/g, " ");
 
         if (extractedText.length > MAX_CHAR) {
           extractedText = extractedText.slice(0, MAX_CHAR);
           resCharLength = "Jumlah melebihi 2000 karakter, hanya mengambil 2000 karakter pertama";
         }
 
-        // predict
-        await tfPredict(extractedText);
+        // const destinationUri = filesResponse.responses[0].outputConfig.gcsDestination.uri;
 
-        const destinationUri = filesResponse.responses[0].outputConfig.gcsDestination.uri;
+        // Predict
+        var prediction;
+        try {
+          const response = await axios.post("http://127.0.0.1:5003/predict", { data: extractedText });
+          prediction = response.data.prediction;
+          console.log(prediction);
+          // res.json({ prediction });
+        } catch (error) {
+          // console.log(error.message);
+          res.json({ error: error.message });
+        }
 
         // ini masih belum bisa outputfilenamenya sementara gitu aja dulu
-        await db.promise().query(`INSERT INTO uploads (raw_file, raw_filename, processed_file, processed_filename, result_file, user_id) VALUES (?, ?, ?, ?, 'generated by ai', ?)`, [publicUrl, fileName, textPublicUrl, outputFileName, id]);
+        // await db.promise().query(`INSERT INTO uploads (raw_file, raw_filename, processed_file, processed_filename, result_file, user_id) VALUES (?, ?, ?, ?, 'generated by ai', ?)`, [publicUrl, fileName, textPublicUrl, outputFileName, id]);
+        const resultId = crypto.randomInt(10000000);
+        const uploadId = crypto.randomInt(10000000);
+        // Database
+        await db.promise().query(`INSERT INTO uploads (id, raw_file, raw_filename, processed_file, processed_filename, user_id) VALUES(?, ?, ?, ?, ?, ?)`, [uploadId, publicUrl, fileName, textPublicUrl, outputFileName, id]);
 
+        await db
+          .promise()
+          .query(`INSERT INTO results (id, result_generated, ai_percentage, human_percentage, list_ai_sentences, upload_id) VALUES(?, ?, ?, ?, ?, ?)`, [
+            resultId,
+            prediction.result,
+            prediction.ai_precentage,
+            prediction.human_precentage,
+            prediction.list_ai_sentences ,
+            uploadId,
+          ]);
 
         return res.status(200).send({
           message: "Uploaded the file and extracted text successfully: " + req.file.originalname,

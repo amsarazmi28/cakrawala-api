@@ -36,3 +36,4 @@ app.listen(PORT, () => {
 // Nambah tabel buat paket premium dan durasi
 // Urusan PDF (nama file gabisa di custom, masih belom  bisa akses json)
 // yang delete history yang pdf masih salah karna filenamenya masih belum ada solusi
+// Mengganti tipe data menjadi bentuk teks langsung

@@ -17,6 +17,8 @@ function jwtDecoded(reqCookie) {
     return id;
 }
 
+
+
 exports.getHistory = async(req, res) => {
     // jwt
     id = jwtDecoded(req.cookies.jwt);
@@ -68,14 +70,14 @@ exports.deleteHistory = async (req, res) => {
             await db.promise().query(`DELETE FROM uploads WHERE id = ?`, [rows[0].id]);
 
             const response = res.status(201).send({
-                status: "Success",
+                status: "Sukses",
                 message: "Files deleted successfully",
             });
 
             return response;
         } else {
             const response = res.status(404).send({
-                status: "Error",
+                status: "Gagal",
                 message: "No history found with the given ID",
             });
 
@@ -84,7 +86,7 @@ exports.deleteHistory = async (req, res) => {
     } catch (error) {
         console.error(error);
         const response = res.status(500).send({
-            status: "Error",
+            status: "Gagal",
             message: "Internal Server Error",
         });
 
