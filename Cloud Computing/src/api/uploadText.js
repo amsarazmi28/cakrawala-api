@@ -9,6 +9,8 @@ const { response } = require("express");
 const axios = require("axios");
 const crypto = require("crypto");
 
+// BERUBAH
+
 // function decoded
 function jwtDecoded(reqCookie) {
   // jwt decode

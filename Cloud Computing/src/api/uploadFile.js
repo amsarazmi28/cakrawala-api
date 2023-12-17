@@ -11,8 +11,10 @@ const vision = require("@google-cloud/vision").v1;
 const client = new vision.ImageAnnotatorClient();
 const axios = require("axios");
 const crypto = require("crypto");
-// db
 
+// DIUBAH
+
+// db
 const db = require("../database");
 require("dotenv").config();
 
